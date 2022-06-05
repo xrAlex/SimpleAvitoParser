@@ -13,7 +13,6 @@
   {
     Console.WriteLine(ads.Title);
   }
-}
 
 ```
 Пример использования многопоточного режима парсинга с прокси
@@ -33,7 +32,6 @@
   foreach (var ads in result)
   {
     Console.WriteLine(ads.Title);
-  }
   }
 
 ```
