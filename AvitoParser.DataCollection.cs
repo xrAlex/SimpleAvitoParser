@@ -79,7 +79,7 @@ namespace Parser
         {
             var adsData = pagesData.AsParallel().SelectMany(GetAdsFromPage);
             var result = new HashSet<Advertisement>(adsData).ToList();
-            
+
             return result.Count > 0 ? result : null;
         }
 
@@ -94,7 +94,7 @@ namespace Parser
             var links = new List<string>();
             var delimiter = "?p=";
 
-            if (baseLink.Contains("?"))
+            if (baseLink.Contains('?'))
             {
                 delimiter = "&p=";
             }
@@ -140,7 +140,6 @@ namespace Parser
         /// Нормализует ссылку для корректного парсинга
         /// </summary>
         /// <param name="link"></param>
-        /// <returns></returns>
         private static string NormalizeLink(string link)
         {
             var args = link.Split("?");
