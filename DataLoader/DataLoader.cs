@@ -73,7 +73,7 @@ namespace Parser.DataLoader
                 var json = await worker.GetJsonFromLinkAsync(link).ConfigureAwait(false);
 
                 _logger?.Info($"Parsing Link {link} finished");
-                _workersPool.ReleaseWorker(worker);
+                _workersPool.ReleaseWorker(ref worker);
                 return json;
             }
             catch (WorkerBlockedException)

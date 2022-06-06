@@ -7,7 +7,6 @@ namespace Parser.DataLoader
         private readonly Stack<ParserWorker> _workers = new();
         private readonly List<ParserWorker> _workersPool = new();
         private readonly object _cycleLocker = new();
-        private readonly object _disposeLocker = new();
         private static ParsersPool? _pool;
 
         /// <summary>
@@ -30,15 +29,13 @@ namespace Parser.DataLoader
                 foreach (var proxy in proxies)
                 {
                     var worker = new ParserWorker(proxy, sessionId);
-                    _pool._workersPool.Add(worker);
-                    _pool.AddWorker(worker);
+                    _pool.AddWorker(ref worker);
                 }
             }
             else
             {
                 var worker = new ParserWorker(sessionId: sessionId);
-                _pool._workersPool.Add(worker);
-                _pool.AddWorker(worker);
+                _pool.AddWorker(ref worker);
             }
 
             return _pool;
@@ -47,8 +44,11 @@ namespace Parser.DataLoader
         /// <summary>
         /// Добавляет ссылку на клиент в пул
         /// </summary>
-        private void AddWorker(ParserWorker worker)
-            => _workers.Push(worker);
+        private void AddWorker(ref ParserWorker worker)
+        {
+            _workersPool.Add(worker);
+            _workers.Push(worker);
+        }
 
         /// <summary>
         /// Возвращает первый клиент в очереди
@@ -59,7 +59,7 @@ namespace Parser.DataLoader
         /// <summary>
         /// Возвращает клиент в пул после ожидания
         /// </summary>
-        public void ReleaseWorker(ParserWorker worker, int timeout = 5000)
+        public void ReleaseWorker(ref ParserWorker worker, int timeout = 5000)
         {
             var item = worker;
 
@@ -91,8 +91,6 @@ namespace Parser.DataLoader
             }
         }
 
-        private ParsersPool() { }
-
 
         /// <summary>
         /// Удаляет клиент и ссылку на него из пула
@@ -111,5 +109,7 @@ namespace Parser.DataLoader
                 await worker.DisposeAsync();
             }
         }
+
+        private ParsersPool() { }
     }
 }
