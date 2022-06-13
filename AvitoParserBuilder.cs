@@ -1,11 +1,11 @@
-﻿using Parser.Entities;
-using xrAsyncLogger;
+﻿using Microsoft.Extensions.Logging;
+using Parser.Entities;
 
 namespace Parser
 {
     public class AvitoParserBuilder
     {
-        private Logger? _logger;
+        private ILogger? _logger;
         private List<ProxySettings>? _proxies;
         private int _parsingDelay = 5000;
         private string? _sessionId;
@@ -53,18 +53,8 @@ namespace Parser
         /// <summary>
         /// Производит логирование информации парсера
         /// </summary>
-        public AvitoParserBuilder EnableLogs(int maxLogsFiles = 10, int maxFileSizeInMb = 10, bool debugLogs = true)
+        public AvitoParserBuilder EnableLogs(ILogger logger)
         {
-            var logger = new LoggerConfiguration()
-                .WriteDebugLogs(debugLogs)
-                .DuplicateLogsInConsole()
-                .SetLogFileName("Avito Parser")
-                .SetLogFilesDirectory(".\\")
-                .SetLoggerThreadBackground()
-                .SetMaxLogFileSize(maxFileSizeInMb)
-                .SetLogFilesCleanup(maxLogsFiles)
-                .BuildLogger();
-
             _logger = logger;
             return this;
         }

@@ -1,16 +1,16 @@
-﻿using Parser.Entities;
-using xrAsyncLogger;
+﻿using Microsoft.Extensions.Logging;
+using Parser.Entities;
 
 namespace Parser
 {
     public sealed partial class AvitoParser : IAsyncDisposable
     {
-        private readonly Logger? _logger;
+        private readonly ILogger? _logger;
         private readonly DataLoader.DataLoader _loader;
         public event EventHandler<IEnumerable<Advertisement>?>? ParsingFinished;
 
         internal AvitoParser(string? sessionId, int parsingDelay,
-            Logger? logger = null, IEnumerable<ProxySettings>? proxies = null)
+            ILogger? logger = null, IEnumerable<ProxySettings>? proxies = null)
         {
             _logger = logger;
             _loader = new DataLoader.DataLoader(proxies, _logger, sessionId);
@@ -38,7 +38,6 @@ namespace Parser
 
         public async ValueTask DisposeAsync()
         {
-            _logger?.Dispose();
             await _loader.DisposeAsync();
         }
     }

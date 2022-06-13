@@ -1,17 +1,17 @@
 ﻿using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Parser.Entities;
 using Parser.Extensions;
-using xrAsyncLogger;
 
 namespace Parser.DataLoader
 {
     internal sealed class DataLoader : IAsyncDisposable
     {
         private readonly ParsersPool _workersPool;
-        private readonly Logger? _logger;
+        private readonly ILogger? _logger;
 
-        public DataLoader(IEnumerable<ProxySettings>? proxies, Logger? logger, string? sessionId)
+        public DataLoader(IEnumerable<ProxySettings>? proxies, ILogger? logger, string? sessionId)
         {
             _logger = logger;
             _workersPool = ParsersPool.CreateFixedPool(proxies, sessionId);
@@ -30,7 +30,7 @@ namespace Parser.DataLoader
             var timeout = linksCollection.Length * linkParsingTimeLimit;
             var stopwatch = Stopwatch.StartNew();
 
-            _logger?.Info($"Start parsing {linksCollection.Length} links");
+            _logger?.LogInformation($"Start parsing {linksCollection.Length} links");
 
             var tasksPool = linksCollection
                 .AsParallel()
@@ -43,7 +43,7 @@ namespace Parser.DataLoader
 
             var results = await ThreadingEx.GetResults(tasksPool, timeout);
 
-            _logger?.Info($"Parsing completed in: {stopwatch.Elapsed}");
+            _logger?.LogInformation($"Parsing completed in: {stopwatch.Elapsed}");
             return results;
         }
 
@@ -59,7 +59,7 @@ namespace Parser.DataLoader
 
             if (tries > 3)
             {
-                _logger?.Warn($"An error has occurred while parsing link: {link}, tries limit exceeded");
+                _logger?.LogWarning($"An error has occurred while parsing link: {link}, tries limit exceeded");
                 return null;
             }
 
@@ -69,22 +69,22 @@ namespace Parser.DataLoader
 
             try
             {
-                _logger?.Info($"Founded free worker, starts parsing link {link}");
+                _logger?.LogInformation($"Founded free worker, starts parsing link {link}");
                 var json = await worker.GetJsonFromLinkAsync(link).ConfigureAwait(false);
 
-                _logger?.Info($"Parsing Link {link} finished");
+                _logger?.LogInformation($"Parsing Link {link} finished");
                 _workersPool.ReleaseWorker(ref worker);
                 return json;
             }
             catch (WorkerBlockedException)
             {
-                _logger?.Warn($"An error has occurred while parsing link {link}, {worker.Name} is blocked");
+                _logger?.LogWarning($"An error has occurred while parsing link {link}, {worker.Name} is blocked");
                 await _workersPool.DisposeWorkerAsync(worker);
                 return await ParseLinkAsync(link, tries, cts);
             }
             catch (Exception ex)
             {
-                _logger?.Warn($"An error has occurred while parsing link: {link}", ex);
+                _logger?.LogWarning($"An error has occurred while parsing link: {link}", ex);
                 return await ParseLinkAsync(link, tries, cts);
             }
         }
@@ -92,7 +92,6 @@ namespace Parser.DataLoader
         public async ValueTask DisposeAsync()
         {
             await _workersPool.DisposeAsync();
-            _logger?.Dispose();
         }
     }
 }

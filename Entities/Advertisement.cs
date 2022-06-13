@@ -35,7 +35,7 @@
         /// <summary>
         /// Уникальный идентификатор объявления
         /// </summary>
-        public long? Identifier { get; }
+        public long Identifier { get; }
 
         /// <summary>
         /// Цена указанная в объявлении
@@ -89,7 +89,7 @@
         public override int GetHashCode() 
             => Identifier.GetHashCode();
 
-        internal Advertisement(string title, string link, long? identifier,
+        internal Advertisement(string title, string link, long identifier,
             int? cost, string? lastUpdate, string? description, string? imageLink,
             string? location, string? detailedLocation, User? owner, string? category,
             bool? sale, string? city, DateTime? creationTime)

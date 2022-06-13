@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using Parser.DataPaths;
 using Parser.Entities;
 using Parser.Extensions;
@@ -39,10 +40,11 @@ namespace Parser
         {
             var title = GetTitle(adsToken);
             var link = GetLink(adsToken);
+            var identifier = GetIdentifier(adsToken);
 
-            if (title == null || link == null)
+            if (title == null || link == null || identifier == null)
             {
-                _logger?.Info($"An error occurred when parsing ads data: title '{title}', link: '{link}'");
+                _logger?.LogWarning($"An error occurred when parsing ads data: title '{title}', link: '{link}', identifier {identifier}");
                 return null;
             }
 
@@ -52,10 +54,11 @@ namespace Parser
                 reviewsCount: GetReviewsCount(adsToken),
                 closedAds: GetClosedAdsCount(adsToken)
             );
+
             var ads = new Advertisement
             (
                 title: title,
-                identifier: GetIdentifier(adsToken),
+                identifier: identifier.Value,
                 cost: GetCost(adsToken),
                 link: link,
                 location: GetLocation(adsToken),
@@ -88,8 +91,11 @@ namespace Parser
         /// </summary>
         private IEnumerable<string> GetAllPagesLinks(string baseLink, int? startPage = null, int? endPage = null)
         {
-            _logger?.Info($"Form pages links for {baseLink}");
-            baseLink = NormalizeLink(baseLink);
+            _logger?.LogInformation($"Form pages links for {baseLink}");
+            if (baseLink.Contains("&"))
+            {
+                baseLink = NormalizeLink(baseLink);
+            }
             startPage ??= 1;
             var links = new List<string>();
             var delimiter = "?p=";
@@ -102,7 +108,7 @@ namespace Parser
             if (endPage != null && endPage == 1)
             {
                 links.Add($"{baseLink}{delimiter}1");
-                _logger?.Info($"Working on {links.Count} pages");
+                _logger?.LogInformation($"Working on {links.Count} pages");
                 return links;
             }
 
@@ -120,7 +126,7 @@ namespace Parser
                     if (endPage > lastPage)
                     {
                         endPage = lastPage;
-                        _logger?.Info($"Wrong pages range, valid is {startPage}-{endPage}");
+                        _logger?.LogInformation($"Wrong pages range, valid is {startPage}-{endPage}");
                     }
                 }
             }
@@ -131,7 +137,7 @@ namespace Parser
                 currentPage++;
             }
 
-            _logger?.Info($"Working on {links.Count} pages");
+            _logger?.LogInformation($"Working on {links.Count} pages");
 
             return links;
         }
