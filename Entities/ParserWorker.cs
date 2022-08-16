@@ -101,7 +101,7 @@ namespace Parser.Entities
 
         public ParserWorker(ProxySettings? proxy = null, string? sessionId = null)
         {
-            Parser = new BrowserClient(proxy, sessionId);
+            Parser = new BrowserClient(proxy);
             Name = proxy == null ? "User worker" : $"Proxy worker [{proxy.Ip}:{proxy.Port}]";
         }
 

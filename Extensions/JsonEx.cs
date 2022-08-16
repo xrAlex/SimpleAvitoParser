@@ -8,10 +8,10 @@ namespace Parser.Extensions
         /// <summary>
         /// Сериализует данные объекта в файл
         /// </summary>
-        /// <param name="serializtionObject">Объект сериализации</param>
+        /// <param name="serializationObject">Объект сериализации</param>
         /// <param name="path">Путь сохранения файла</param>
         /// <returns>Результат выполнения операции</returns>
-        public static bool TrySaveToFile(object serializtionObject, string path)
+        public static bool TrySaveToFile(object serializationObject, string path)
         {
             try
             {
@@ -23,7 +23,7 @@ namespace Parser.Extensions
                 using var fs = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite);
                 using var writer = new StreamWriter(fs);
 
-                serializer.Serialize(writer, serializtionObject);
+                serializer.Serialize(writer, serializationObject);
                 return true;
             }
             catch

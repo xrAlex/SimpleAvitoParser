@@ -77,6 +77,7 @@ namespace Parser.DataPaths
         public string[] LocationDetailed { get; } =
         {
             "iva.GeoStep[0].payload.geoForItems.formattedAddress",
+            "geo.geoReferences[0].content"
         };
 
         public string[] AdsId { get; } =
@@ -121,9 +122,6 @@ namespace Parser.DataPaths
             return instance;
         }
 
-        private DataJsonPath()
-        {
-
-        }
+        private DataJsonPath(){}
     }
 }

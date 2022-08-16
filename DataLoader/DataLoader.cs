@@ -10,11 +10,16 @@ namespace Parser.DataLoader
     {
         private readonly ParsersPool _workersPool;
         private readonly ILogger? _logger;
+        private readonly int _workerReleaseDelay;
+        private readonly bool _ignoreIpBlock;
 
-        public DataLoader(IEnumerable<ProxySettings>? proxies, ILogger? logger, string? sessionId)
+        public DataLoader(IEnumerable<ProxySettings>? proxies, ILogger? logger,
+            int delay = 5000, bool hybridMode = false, bool ignoreIpBlock = false)
         {
             _logger = logger;
-            _workersPool = ParsersPool.CreateFixedPool(proxies, sessionId);
+            _workersPool = ParsersPool.CreateFixedPool(proxies, hybridMode);
+            _workerReleaseDelay = delay;
+            _ignoreIpBlock = ignoreIpBlock;
         }
 
         /// <summary>
@@ -22,7 +27,7 @@ namespace Parser.DataLoader
         /// </summary>
         /// <param name="links">Список страниц</param>
         /// <returns>Список данных с указанных ссылок в формате Json</returns>
-        internal async Task<IEnumerable<JToken?>> ParseLinksAsync(IEnumerable<string> links, CancellationToken cts = new())
+        internal async Task<IEnumerable<JToken?>> ParseLinksAsync(IEnumerable<string> links, CancellationToken cts = default)
         {
             const int linkParsingTimeLimit = 30000;
 
@@ -34,11 +39,7 @@ namespace Parser.DataLoader
 
             var tasksPool = linksCollection
                 .AsParallel()
-                .Select(link =>
-                    Task.Run(() =>
-                        ParseLinkAsync(
-                            link: link,
-                            cts: cts), cts))
+                .Select(link => ParseLinkAsync(link: link, cts: cts))
                 .ToList();
 
             var results = await ThreadingEx.GetResults(tasksPool, timeout);
@@ -53,7 +54,7 @@ namespace Parser.DataLoader
         /// <param name="link">Ссылка на страницу</param>
         /// <param name="tries">Текущая попытка парсинга страницы</param>
         /// <returns>Список данных в формате Json</returns>
-        public async Task<JToken?> ParseLinkAsync(string link, int tries = 0, CancellationToken cts = new())
+        public async Task<JToken?> ParseLinkAsync(string link, int tries = 0, CancellationToken cts = default)
         {
             tries++;
 
@@ -73,13 +74,18 @@ namespace Parser.DataLoader
                 var json = await worker.GetJsonFromLinkAsync(link).ConfigureAwait(false);
 
                 _logger?.LogInformation($"Parsing Link {link} finished");
-                _workersPool.ReleaseWorker(ref worker);
+                _workersPool.ReleaseWorker(ref worker, _workerReleaseDelay);
                 return json;
             }
             catch (WorkerBlockedException)
             {
                 _logger?.LogWarning($"An error has occurred while parsing link {link}, {worker.Name} is blocked");
-                await _workersPool.DisposeWorkerAsync(worker);
+
+                if (!_ignoreIpBlock)
+                {
+                    await _workersPool.DisposeWorkerAsync(worker);
+                }
+
                 return await ParseLinkAsync(link, tries, cts);
             }
             catch (Exception ex)

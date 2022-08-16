@@ -45,7 +45,18 @@ namespace Parser.Extensions
 
                     if (value != null)
                     {
-                        return value;
+                        if (target.Type == JTokenType.String)
+                        {
+                            var val = value as string;
+                            if (!string.IsNullOrWhiteSpace(val))
+                            {
+                                return value;
+                            }
+                        }
+                        else
+                        {
+                            return value;
+                        }
                     }
                 }
             }

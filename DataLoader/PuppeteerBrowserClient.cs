@@ -9,8 +9,8 @@ namespace Parser.DataLoader
         private readonly Browser _client;
         private readonly Credentials? _proxyCredentials;
         private readonly CookieParam? _sessionId;
-
-        public BrowserClient(ProxySettings? proxy = null, string? sessionId = null)
+        private readonly Random _random = new();
+        public BrowserClient(ProxySettings? proxy = null)
         {
             using var browserFetcher = new BrowserFetcher();
             var download = browserFetcher.DownloadAsync().Result;
@@ -28,7 +28,9 @@ namespace Parser.DataLoader
                 "--disable-notifications",
                 "--disable-translate",
                 "--mute-audio",
-                "--no-referrers"
+                "--no-referrers",
+                "--blink-settings=imagesEnabled=false",
+                "--disable-gpu"
             };
 
             if (proxy != null)
@@ -39,17 +41,6 @@ namespace Parser.DataLoader
                 {
                     Username = proxy.Login,
                     Password = proxy.Pass
-                };
-            }
-
-            if (sessionId != null)
-            {
-                _sessionId = new CookieParam
-                {
-                    Domain = ".avito.ru",
-                    Name = "sessid",
-                    Value = sessionId,
-                    HttpOnly = true
                 };
             }
 
@@ -78,12 +69,14 @@ namespace Parser.DataLoader
                     await page.AuthenticateAsync(_proxyCredentials).ConfigureAwait(false);
                 }
 
+                await page.SetExtraHttpHeadersAsync(new Dictionary<string, string>{{ "Accept", "application/json" }});
+
                 if (_sessionId != null)
                 {
                     await page.SetCookieAsync(_sessionId).ConfigureAwait(false);
                 }
 
-                await page.GoToAsync(link).ConfigureAwait(false);
+                await page.GoToAsync(link, WaitUntilNavigation.DOMContentLoaded).ConfigureAwait(false);
                 await ThrowWhenClientBlocked(page);
                 var data = await GetScriptsData(page);
                 await page.CloseAsync().ConfigureAwait(false);
@@ -102,16 +95,25 @@ namespace Parser.DataLoader
         /// <returns></returns>
         private static async Task ThrowWhenClientBlocked(Page page)
         {
-            var blockingElement = await page.QuerySelectorAsync("body > div > div > h1");
-
-            if (blockingElement != null)
+            var blockingElementsSelectors = new []
             {
-                var innerTextHandle = await blockingElement.GetPropertyAsync("innerText");
-                var innerText = await innerTextHandle.JsonValueAsync<string>();
+                "body > div > div > h1",
+                "body > div.layout > div > h2"
+            };
 
-                if (innerText.Contains("Доступ ограничен"))
+             foreach (var selector in blockingElementsSelectors)
+            {
+                var blockingElement = await page.QuerySelectorAsync(selector);
+
+                if (blockingElement != null)
                 {
-                    throw new WorkerBlockedException();
+                    var innerTextHandle = await blockingElement.GetPropertyAsync("innerText");
+                    var innerText = await innerTextHandle.JsonValueAsync<string>();
+
+                    if (innerText.Contains("ограничен"))
+                    {
+                        throw new WorkerBlockedException();
+                    }
                 }
             }
         }
@@ -139,7 +141,7 @@ namespace Parser.DataLoader
         /// <summary>
         /// Возращает случайный User Agent из списка
         /// </summary>
-        private static string GetRandomAgent()
+        private string GetRandomAgent()
         {
             string[] clients =
             {
@@ -150,13 +152,12 @@ namespace Parser.DataLoader
                 "Mozilla / 5.0(Windows NT 10.0; Win64; x64; rv: 78.0) Gecko / 20100101 Firefox / 78.0"
             };
 
-            return clients[new Random().Next(0, clients.Length)];
+            return clients[_random.Next(0, clients.Length)];
         }
 
         public async ValueTask DisposeAsync()
         {
-           await _client.CloseAsync();
-           await _client.DisposeAsync();
+            await _client.DisposeAsync();
         }
     }
 }

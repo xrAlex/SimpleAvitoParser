@@ -5,11 +5,7 @@ namespace Parser
 {
     public class AvitoParserBuilder
     {
-        private ILogger? _logger;
-        private List<ProxySettings>? _proxies;
-        private int _parsingDelay = 5000;
-        private string? _sessionId;
-
+        private readonly ParserSettings _settings = new ();
         /// <summary>
         /// Устанавливает задержку освобождения клиентов
         /// </summary>
@@ -17,7 +13,7 @@ namespace Parser
         /// <param name="seconds">Значение задержки в секундах</param>
         public AvitoParserBuilder SetParsingDelay(int seconds)
         {
-            _parsingDelay = seconds;
+            _settings.ParsingDelay = seconds;
             return this;
         }
 
@@ -26,42 +22,49 @@ namespace Parser
         /// </summary>
         public AvitoParserBuilder UseHybridMode()
         {
-            // TODO: Реализовать
-            return this;
-        }
-
-        /// <summary>
-        /// Устанавливает дял каждого клиента ID сессии Avito
-        /// </summary>
-        /// <remarks>ID сессии позволяет частично обойти блокировки и получать больше данных со страницы</remarks>
-        public AvitoParserBuilder SetSessionId(string id)
-        {
-            _sessionId = id;
+            _settings.HybridMode = true;
             return this;
         }
 
         /// <summary>
         /// Устанавливает доступный пул прокси для клиентов парсинга
         /// </summary>
-        /// <returns></returns>
         public AvitoParserBuilder SetProxies(List<ProxySettings> proxies)
         {
-            _proxies = proxies;
+            _settings.Proxies = proxies;
             return this;
         }
 
         /// <summary>
-        /// Производит логирование информации парсера
+        /// Парсер не будет проверять заблокирован ли клиент по IP
+        /// </summary>
+        public AvitoParserBuilder IgnoreIpBlock()
+        {
+            _settings.IgnoreIpBlock = true;
+            return this;
+        }
+
+        /// <summary>
+        /// Отключает проверку доступных для парсинга страниц
+        /// </summary>
+        public AvitoParserBuilder DisablePagesRangeValidation()
+        {
+            _settings.PageValidation = false;
+            return this;
+        }
+
+        /// <summary>
+        /// Активирует логирование парсинга
         /// </summary>
         public AvitoParserBuilder EnableLogs(ILogger logger)
         {
-            _logger = logger;
+            _settings.Logger = logger;
             return this;
         }
 
         public AvitoParser Build()
         {
-            return new AvitoParser(_sessionId, _parsingDelay, _logger, _proxies);
+            return new AvitoParser(_settings);
         }
     }
 }

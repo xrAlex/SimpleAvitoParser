@@ -5,7 +5,6 @@ namespace Parser.DataLoader
     internal sealed class ParsersPool : IAsyncDisposable
     {
         private readonly Stack<ParserWorker> _workers = new();
-        private readonly List<ParserWorker> _workersPool = new();
         private readonly object _cycleLocker = new();
         private static ParsersPool? _pool;
 
@@ -14,8 +13,7 @@ namespace Parser.DataLoader
         /// </summary>
         /// <remarks>В случае если пул уже создан возвращает существующий</remarks>
         /// <param name="proxies">Список прокси</param>
-        /// <param name="sessionId">ID сессии Avito.ru</param>
-        public static ParsersPool CreateFixedPool(IEnumerable<ProxySettings>? proxies, string? sessionId)
+        public static ParsersPool CreateFixedPool(IEnumerable<ProxySettings>? proxies, bool useClientWorker = false)
         {
             if (_pool != null)
             {
@@ -28,13 +26,19 @@ namespace Parser.DataLoader
             {
                 foreach (var proxy in proxies)
                 {
-                    var worker = new ParserWorker(proxy, sessionId);
+                    var proxyWorker = new ParserWorker(proxy);
+                    _pool.AddWorker(ref proxyWorker);
+                }
+
+                if (useClientWorker)
+                {
+                    var worker = new ParserWorker();
                     _pool.AddWorker(ref worker);
                 }
             }
             else
             {
-                var worker = new ParserWorker(sessionId: sessionId);
+                var worker = new ParserWorker();
                 _pool.AddWorker(ref worker);
             }
 
@@ -46,7 +50,6 @@ namespace Parser.DataLoader
         /// </summary>
         private void AddWorker(ref ParserWorker worker)
         {
-            _workersPool.Add(worker);
             _workers.Push(worker);
         }
 
@@ -56,24 +59,20 @@ namespace Parser.DataLoader
         public ParserWorker? GetWorker()
             => _workers.TryPop(out var freeWorker) ? freeWorker : null;
 
-        /// <summary>
-        /// Возвращает клиент в пул после ожидания
-        /// </summary>
-        public void ReleaseWorker(ref ParserWorker worker, int timeout = 5000)
+        public void ReleaseWorker(ref ParserWorker worker, int delay)
         {
-            var item = worker;
-
+            var workerToRelease = worker;
             Task.Run(async () =>
             {
-                await Task.Delay(timeout);
-                _workers.Push(item);
+                await Task.Delay(delay);
+                _workers.Push(workerToRelease);
             });
         }
 
         /// <summary>
         /// Ожидает освобождение клиента
         /// </summary>
-        public ParserWorker? WaitForFreeWorker(CancellationToken cts = new())
+        public ParserWorker? WaitForFreeWorker(CancellationToken cts = default)
         {
             lock (_cycleLocker)
             {
@@ -98,15 +97,14 @@ namespace Parser.DataLoader
         /// <param name="worker"></param>
         public async Task DisposeWorkerAsync(ParserWorker worker)
         {
-            _workersPool.Remove(worker);
             await worker.DisposeAsync();
         }
 
         public async ValueTask DisposeAsync()
         {
-            foreach (var worker in _workersPool)
+            foreach (var worker in _workers)
             {
-                await worker.DisposeAsync();
+                await DisposeWorkerAsync(worker);
             }
         }
 

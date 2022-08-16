@@ -13,14 +13,12 @@ namespace Parser
         /// </summary>
         private IEnumerable<Advertisement> GetAdsFromPage(JToken? pageData)
         {
+            var items = pageData?.SelectToken("data.catalog.items");
+            
+            if (items == null) return null;
+
             var adsCollection = new List<Advertisement>();
-
-            if (pageData == null) return adsCollection;
-
-            var items = pageData.SelectToken("data.catalog.items");
-
-            if (items == null) return adsCollection;
-
+            
             foreach (var item in items)
             {
                 var data = CollectAdsData(item);
@@ -92,13 +90,11 @@ namespace Parser
         private IEnumerable<string> GetAllPagesLinks(string baseLink, int? startPage = null, int? endPage = null)
         {
             _logger?.LogInformation($"Form pages links for {baseLink}");
-            if (baseLink.Contains("&"))
-            {
-                baseLink = NormalizeLink(baseLink);
-            }
+            baseLink = NormalizeLink(baseLink);
             startPage ??= 1;
             var links = new List<string>();
             var delimiter = "?p=";
+            int? lastPage = null;
 
             if (baseLink.Contains('?'))
             {
@@ -112,7 +108,11 @@ namespace Parser
                 return links;
             }
 
-            var lastPage = GetLastPageNumber(baseLink);
+            if (_pageValidation)
+            {
+                lastPage = GetLastPageNumber(baseLink);
+            }
+
             var currentPage = startPage;
 
             if (endPage == null)
@@ -149,25 +149,20 @@ namespace Parser
         private static string NormalizeLink(string link)
         {
             var args = link.Split("?");
+            var normalized = args[0] + "?" + "s=104";
+
+            if (args.Length <= 1) return normalized;
+
             var argsArray = args[1].Split("&");
 
-            var normalized = args[0] + "?";
-
-            for (var i = 0; i < argsArray.Length; i++)
+            foreach (var arg in argsArray)
             {
-                var arg = argsArray[i];
-
                 if (arg.Contains("p=")) continue;
+                if (arg.Contains("s=")) continue;
 
-                if (i == 0)
-                {
-                    normalized += $"{arg}";
-                }
-                else
-                {
-                    normalized += $"&{arg}";
-                }
+                normalized += $"&{arg}";
             }
+
             return normalized;
         }
 
@@ -179,7 +174,7 @@ namespace Parser
             var jsonData = _loader.ParseLinkAsync(startLink).Result;
 
             if (jsonData == null) return null;
-            
+
             var adsCount = ParsingEx.GetJsonValue<int?>(jsonData, DataJsonPath.Instance.TotalElements);
             var elementsOnPage = ParsingEx.GetJsonValue<int?>(jsonData, DataJsonPath.Instance.ItemsOnPage);
             var elementsOnMainPage = ParsingEx.GetJsonValue<int?>(jsonData, DataJsonPath.Instance.ItemsOnMainPage);
