@@ -1,55 +1,66 @@
 ﻿using Microsoft.Extensions.Logging;
 using Parser.Entities;
 
-namespace Parser
+namespace Parser;
+
+public sealed partial class AvitoParser : IDisposable
 {
-    public sealed partial class AvitoParser : IAsyncDisposable
+    private readonly ILogger? _logger;
+    private readonly DataLoader.DataLoader _loader;
+    private readonly bool _pageValidation;
+    public event EventHandler<Tuple<IEnumerable<Advertisement>?, object?>>? LinkParsed;
+
+    internal AvitoParser(ParserSettings settings)
     {
-        private readonly ILogger? _logger;
-        private readonly DataLoader.DataLoader _loader;
-        private readonly bool _pageValidation;
+        _pageValidation = settings.PageValidation;
+        _logger = settings.Logger;
+        _loader = new DataLoader.DataLoader(settings.Proxies, _logger,
+            settings.ParsingDelay, settings.HybridMode, settings.IgnoreIpBlock);
+    }
 
-        internal AvitoParser(ParserSettings settings)
+    /// <summary>
+    /// Собирает данные о всех объявления по указанной ссылке
+    /// </summary>
+    /// <param name="link">Ссылка на Avito.ru с настроенными параметрами поиска</param>
+    /// <param name="startPage">Номер страницы с которой начинать парсинг</param>
+    /// <param name="endPage">Номер конечной страницы парсинга</param>
+    /// <remarks>
+    /// Если не указан номер конечной страницы парсинга, то парсинг будет производится до конца списка объявлений
+    /// </remarks>
+    /// <returns>Результат парсинга предсталвенный списком <see cref="Advertisement"/></returns>
+    public async Task<IEnumerable<Advertisement>?> ParseLinkAsync(string link, int? startPage = null, int? endPage = null, CancellationToken cts = default)
+    {
+        var pages = GetAllPagesLinks(link, startPage, endPage);
+        var data = await _loader.ParseLinksAsync(pages, cts).ConfigureAwait(false);
+        var ads = GetAdsFromPages(data);
+        return ads;
+    }
+
+    public async Task<IEnumerable<Advertisement>?> ParseLinkAsync(string link, bool normalizeLinks = true, CancellationToken cts = default)
+    {
+        if (normalizeLinks)
         {
-            _pageValidation = settings.PageValidation;
-            _logger = settings.Logger;
-            _loader = new DataLoader.DataLoader(settings.Proxies, _logger,
-                settings.ParsingDelay, settings.HybridMode, settings.IgnoreIpBlock);
+            link = NormalizeLink(link);
         }
 
-        /// <summary>
-        /// Собирает данные о всех объявления по указанной ссылке
-        /// </summary>
-        /// <param name="link">Ссылка на Avito.ru с настроенными параметрами поиска</param>
-        /// <param name="startPage">Номер страницы с которой начинать парсинг</param>
-        /// <param name="endPage">Номер конечной страницы парсинга</param>
-        /// <remarks>
-        /// Если не указан номер конечной страницы парсинга, то парсинг будет производится до конца списка объявлений
-        /// </remarks>
-        /// <returns>Результат парсинга предсталвенный списком <see cref="Advertisement"/></returns>
-        public async Task<IEnumerable<Advertisement>?> ParseLink(string link, int? startPage = null, int? endPage = null, CancellationToken cts = new())
-        {
-            var pages = GetAllPagesLinks(link, startPage, endPage);
-            var data = await _loader.ParseLinksAsync(pages, cts).ConfigureAwait(false);
-            var ads = GetAdsFromPages(data);
-            return ads;
-        }
+        var data = await _loader.ParseLinkAsync(link, cts: cts).ConfigureAwait(false);
+        var ads = GetAdsFromPages(data);
+        return ads;
+    }
 
-
-        public async Task<IEnumerable<Advertisement>?> ParseLinks(IEnumerable<string> links, bool normalizeLinks = true, CancellationToken cts = new())
-        {
-            links = normalizeLinks 
-                ? links.Select(NormalizeLink) 
-                : links;
+    public async Task<IEnumerable<Advertisement>?> ParseLinksAsync(IEnumerable<string> links, bool normalizeLinks = true, CancellationToken cts = default)
+    {
+        links = normalizeLinks 
+            ? links.Select(NormalizeLink) 
+            : links;
             
-            var data = await _loader.ParseLinksAsync(links, cts).ConfigureAwait(false);
-            var ads = GetAdsFromPages(data);
-            return ads;
-        }
+        var data = await _loader.ParseLinksAsync(links, cts).ConfigureAwait(false);
+        var ads = GetAdsFromPages(data);
+        return ads;
+    }
 
-        public async ValueTask DisposeAsync()
-        {
-            await _loader.DisposeAsync();
-        }
+    public void Dispose()
+    {
+        _loader.Dispose();
     }
 }

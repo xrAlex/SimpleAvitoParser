@@ -1,7 +1,7 @@
 # SimpleAvitoParser
 Простой парсер для Avito.ru
 
-Для быстрой проверки работы парсинга используйте следующий код:
+Для быстрой проверки работы парсера используйте следующий код:
 ```csharp
 
   using var parser = new AvitoParserBuilder()
